@@ -1,0 +1,33 @@
+# Haelt das Supabase-Gratisprojekt aktiv (Pausierung bei geringer Aktivitaet ueber 7 Tage).
+# Liest URL und Publishable Key aus js/config.js -> keine Secrets noetig.
+# Hinweis: GitHub deaktiviert geplante Workflows in Repositories ohne Aktivitaet nach 60 Tagen
+# und meldet das per E-Mail; dann unter "Actions" wieder aktivieren.
+name: Supabase Keepalive
+on:
+  schedule:
+    - cron: "23 4 * * *"   # taeglich 04:23 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Datenbank anpingen
+        run: |
+          node <<'JS'
+          require("./js/config.js");
+          const { supabaseUrl, supabaseKey } = globalThis.SCHICHTBUCH_CONFIG;
+          if (/DEIN/.test(supabaseUrl + supabaseKey)) { console.log("config.js noch nicht ausgefuellt, ueberspringe."); process.exit(0); }
+          fetch(supabaseUrl + "/rest/v1/rpc/keepalive", {
+            method: "POST",
+            headers: { apikey: supabaseKey, "Content-Type": "application/json" },
+            body: "{}",
+          }).then(async (res) => {
+            const text = await res.text();
+            console.log("HTTP " + res.status + " " + text);
+            if (!res.ok) process.exit(1);
+          }).catch((e) => { console.error(e); process.exit(1); });
+          JS
