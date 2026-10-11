@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1115">
+<title>Schichtbuch — Stunden &amp; Forecast</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#0F1115; --surface:#171A21; --surface-2:#1E222B; --line:#2A2F3A;
+    --text:#E8EAED; --muted:#8B93A1; --signal:#F5A524; --planned:#2DD4BF; --danger:#F87171;
+    --r:14px;
+    --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
+  body{min-height:100dvh}
+  .wrap{max-width:560px;margin:0 auto;padding:16px 16px calc(92px + env(safe-area-inset-bottom))}
+  [hidden]{display:none !important}
+  header.app{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+  header.app h1{font-size:1.15rem;margin:0;letter-spacing:.01em}
+  .pill{font-family:var(--mono);font-size:.72rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:none;cursor:pointer;white-space:nowrap}
+  .pill::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:7px}
+  .pill.ok::before{background:var(--planned)} .pill.wait::before{background:var(--signal)} .pill.err::before{background:var(--danger)}
+  .view{display:none} .view.active{display:block}
+
+  .monthnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .monthnav .label{font-family:var(--mono);font-weight:600}
+  .iconbtn{background:var(--surface);border:1px solid var(--line);color:var(--text);width:44px;height:44px;border-radius:12px;font-size:1.3rem;cursor:pointer}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+  .card.span{grid-column:1/-1}
+  .card .k{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+  .card .v{font-family:var(--mono);font-size:1.3rem;font-weight:650;margin-top:4px}
+  .split{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;color:var(--muted);flex-wrap:wrap}
+  .split b{color:var(--text);font-family:var(--mono);font-weight:600}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .dot.worked{background:var(--signal)} .dot.planned{background:var(--planned)}
+
+  .row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;color:inherit;font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+  .row:active{background:var(--surface-2)}
+  .row .when{min-width:0}
+  .row .date{font-family:var(--mono);font-size:.9rem;font-weight:600}
+  .row .meta{color:var(--muted);font-size:.76rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .amt{text-align:right}
+  .row .gross{font-family:var(--mono);font-weight:600}
+  .row .hrs{color:var(--muted);font-size:.76rem;font-family:var(--mono);margin-top:2px}
+  .bar-s{width:4px;align-self:stretch;border-radius:3px;min-height:38px;background:var(--signal)}
+  .bar-s.planned{background:var(--planned)}
+  .empty{color:var(--muted);text-align:center;padding:34px 12px;font-size:.88rem}
+  .empty .big{color:var(--text);font-weight:600;margin-bottom:6px}
+
+  .total{background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:18px}
+  .total .k{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.06em}
+  .total .v{font-family:var(--mono);font-size:2.2rem;font-weight:650;color:var(--planned);margin-top:4px;line-height:1.1;overflow-wrap:anywhere}
+  .total .note{color:var(--muted);font-size:.78rem;margin-top:8px}
+  .fc-row{margin-bottom:14px}
+  .fc-row .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .fc-row .m,.fc-row .g{font-family:var(--mono);font-size:.86rem;font-weight:600}
+  .track{height:10px;background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .track div{height:100%;background:var(--planned);border-radius:6px}
+  .fc-row .h{color:var(--muted);font-size:.74rem;font-family:var(--mono);margin-top:4px}
+
+  h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:26px 0 12px;font-weight:600}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px}
+  input,select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 12px;font-size:1rem;font-family:var(--sans);min-height:48px}
+  input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+  textarea{min-height:72px;resize:vertical}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{width:100%;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:1rem;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);min-height:48px}
+  .btn.primary{background:var(--signal);border-color:var(--signal);color:#16130A}
+  .btn.danger{color:var(--danger);margin-top:10px}
+  .btn:disabled{opacity:.55;cursor:default}
+  .btnrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .linkbtn{background:none;border:none;color:var(--signal);font-size:.9rem;cursor:pointer;padding:8px 0}
+  .msg{border-radius:12px;padding:12px 14px;font-size:.86rem;margin-bottom:14px;border:1px solid var(--danger);color:var(--danger);background:rgba(248,113,113,.08)}
+  .preview{color:var(--muted);font-family:var(--mono);font-size:.84rem;min-height:1.3em;margin-bottom:14px}
+  .hint{color:var(--muted);font-size:.8rem;line-height:1.5}
+  .typerow{display:grid;grid-template-columns:1fr 96px 44px;gap:8px;margin-bottom:8px}
+  .typerow .iconbtn{height:48px}
+  code{font-family:var(--mono);font-size:.85em;background:var(--surface);padding:2px 5px;border-radius:5px}
+
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(15,17,21,.96);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  nav.tabs button{background:none;border:none;color:var(--muted);padding:10px 4px;font-size:.72rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--sans);min-height:58px}
+  nav.tabs button .ic{font-size:1.2rem;line-height:1}
+  nav.tabs button.active{color:var(--signal)}
+  .toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));max-width:528px;margin:0 auto;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.86rem;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .authbox{max-width:380px;margin:12vh auto 0}
+  .authbox h1{font-size:1.5rem;margin:0 0 6px}
+  .authbox p{color:var(--muted);font-size:.9rem;margin:0 0 22px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ SETUP (Konfiguration fehlt) ============ -->
+  <section id="screen-setup" class="authbox" hidden>
+    <h1>Schichtbuch</h1>
+    <p>Die Verbindung zur Datenbank ist noch nicht eingerichtet. Trage in <code>js/config.js</code> die Projekt-URL und den Publishable Key deines Supabase-Projekts ein (siehe README).</p>
+  </section>
+
+  <!-- ============ LOGIN ============ -->
+  <section id="screen-login" class="authbox" hidden>
+    <h1>Schichtbuch</h1>
+    <p>Melde dich an, um deine Schichten auf diesem Gerät zu laden.</p>
+    <div class="msg" id="loginErr" hidden></div>
+    <form id="loginForm">
+      <div class="field"><label for="lEmail">E-Mail</label><input id="lEmail" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="lPass">Passwort</label><input id="lPass" type="password" autocomplete="current-password" required></div>
+      <button class="btn primary" id="loginBtn" type="submit">Anmelden</button>
+    </form>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <div id="screen-app" hidden>
+    <header class="app">
+      <h1>Schichtbuch</h1>
+      <button class="pill" id="syncState" type="button" title="Jetzt synchronisieren">…</button>
+    </header>
+
+    <section id="view-log" class="view active">
+      <div class="monthnav">
+        <button class="iconbtn" id="prevMonth" aria-label="Vorheriger Monat">‹</button>
+        <span class="label" id="monthLabel">—</span>
+        <button class="iconbtn" id="nextMonth" aria-label="Nächster Monat">›</button>
+      </div>
+      <div class="cards">
+        <div class="card"><div class="k">Stunden</div><div class="v" id="mHours">—</div></div>
+        <div class="card"><div class="k">Verdienst</div><div class="v" id="mGross">—</div></div>
+        <div class="card span"><div class="split">
+          <span><span class="dot worked"></span>Geleistet <b id="mWorked">—</b></span>
+          <span><span class="dot planned"></span>Geplant <b id="mPlanned">—</b></span>
+        </div></div>
+      </div>
+      <div id="logList"></div>
+    </section>
+
+    <section id="view-entry" class="view">
+      <div class="monthnav">
+        <span class="label" id="entryTitle">Schicht erfassen</span>
+        <button class="linkbtn" id="cancelEdit" hidden>Abbrechen</button>
+      </div>
+      <div class="msg" id="entryErr" hidden></div>
+      <div class="field"><label for="fDate">Datum</label><input id="fDate" type="date"></div>
+      <div class="field"><label for="fType">Schichtart</label><select id="fType"></select></div>
+      <div class="grid2">
+        <div class="field"><label for="fStart">Beginn</label><input id="fStart" type="time"></div>
+        <div class="field"><label for="fEnd">Ende</label><input id="fEnd" type="time"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="fBreak">Pause (Min.)</label><input id="fBreak" type="number" inputmode="numeric" min="0" step="5"></div>
+        <div class="field"><label for="fRate">Stundensatz</label><input id="fRate" type="number" inputmode="decimal" min="0" step="0.05"></div>
+      </div>
+      <div class="field"><label for="fNote">Notiz / Objekt (optional)</label><textarea id="fNote" maxlength="500" placeholder="z. B. Objektwache, Nachtschicht"></textarea></div>
+      <div class="preview" id="previewBox"></div>
+      <button class="btn primary" id="saveShift">Schicht speichern</button>
+      <button class="btn danger" id="deleteShift" hidden>Schicht löschen</button>
+    </section>
+
+    <section id="view-forecast" class="view">
+      <div class="total">
+        <div class="k">Erwarteter Verdienst (geplant, ab morgen)</div>
+        <div class="v" id="fcTotal">—</div>
+        <div class="note" id="fcNote"></div>
+      </div>
+      <div id="fcList"></div>
+    </section>
+
+    <section id="view-settings" class="view">
+      <h2 style="margin-top:0">Schichtarten &amp; Sätze</h2>
+      <div id="typeList"></div>
+      <button class="linkbtn" id="addType">+ Schichtart hinzufügen</button>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label for="setBreak">Standard-Pause (Min.)</label><input id="setBreak" type="number" inputmode="numeric" min="0" step="5"></div>
+        <div class="field"><label for="setCurrency">Währung</label><select id="setCurrency"><option>CHF</option><option>EUR</option></select></div>
+      </div>
+      <button class="btn primary" id="saveSettings">Einstellungen speichern</button>
+
+      <h2>Export &amp; Backup</h2>
+      <div class="btnrow">
+        <button class="btn" id="exportCsv">CSV exportieren</button>
+        <button class="btn" id="exportJson">Backup (.json)</button>
+      </div>
+      <button class="btn" id="importJson">Backup importieren</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <p class="hint">Der Import ergänzt fehlende Schichten und überspringt bereits vorhandene. Backups der alten Version (ohne Login) werden ebenfalls gelesen.</p>
+
+      <h2>Konto</h2>
+      <p class="hint" id="accountInfo"></p>
+      <button class="btn" id="logoutBtn">Abmelden</button>
+    </section>
+  </div>
+</div>
+
+<nav class="tabs" id="tabs" hidden>
+  <button data-view="log" class="active"><span class="ic">▤</span>Log</button>
+  <button data-view="entry"><span class="ic">＋</span>Erfassen</button>
+  <button data-view="forecast"><span class="ic">↗</span>Forecast</button>
+  <button data-view="settings"><span class="ic">⚙</span>Einstellungen</button>
+</nav>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/domain.js"></script>
+<script src="js/repository.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
