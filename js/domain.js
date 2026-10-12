@@ -161,6 +161,22 @@
 
   const isUuid = (v) => typeof v === "string" && RE_UUID.test(v);
 
+  /** Zeitfenster in Minuten ab Mitternacht des Schichtdatums; Ende nach Mitternacht -> +24 h. */
+  function intervalOf(s) {
+    const a = toMinutes(s.start);
+    let b = toMinutes(s.end);
+    if (b <= a) b += 1440;
+    return [a, b];
+  }
+
+  /** Zwei Schichten am selben Datum, deren Zeitfenster sich ueberschneiden. */
+  function overlaps(a, b) {
+    if (a.date !== b.date) return false;
+    const [a1, a2] = intervalOf(a);
+    const [b1, b2] = intervalOf(b);
+    return a1 < b2 && b1 < a2;
+  }
+
   /** Fachlicher Schluessel zur Duplikaterkennung beim Import. */
   const naturalKey = (s) => s.date + "|" + s.start + "|" + s.end;
 
@@ -203,6 +219,6 @@
   return {
     defaultSettings, toMinutes, todayISO, isValidDate, durationHours, grossOf, isPlanned, monthKey,
     aggregateMonth, forecastByMonth, shiftsOfMonth, validateInput, normalizeShift, normalizeSettings,
-    isUuid, naturalKey, toCsv,
+    isUuid, naturalKey, overlaps, toCsv,
   };
 });

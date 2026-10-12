@@ -85,6 +85,17 @@
   .typerow .iconbtn{height:48px}
   code{font-family:var(--mono);font-size:.85em;background:var(--surface);padding:2px 5px;border-radius:5px}
 
+  details.import{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:18px}
+  details.import summary{cursor:pointer;font-weight:600;font-size:.92rem;color:var(--signal)}
+  details.import .body{padding-top:12px}
+  details.import textarea{min-height:110px;font-family:var(--mono);font-size:.8rem}
+  .imp{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line);font-size:.84rem}
+  .imp .t{font-family:var(--mono);font-weight:600}
+  .imp .o{grid-column:1/-1;color:var(--muted);font-size:.78rem;overflow-wrap:anywhere}
+  .badge{font-size:.7rem;font-family:var(--mono);border-radius:999px;padding:3px 8px;border:1px solid var(--line);align-self:start;white-space:nowrap}
+  .badge.new{color:var(--planned);border-color:var(--planned)} .badge.existing{color:var(--muted)}
+  .badge.reserve{color:var(--muted);border-style:dashed} .badge.warn{color:var(--danger);border-color:var(--danger)}
+  .impsum{font-size:.84rem;color:var(--muted);margin:10px 0}
   nav.tabs{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(15,17,21,.96);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   nav.tabs button{background:none;border:none;color:var(--muted);padding:10px 4px;font-size:.72rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--sans);min-height:58px}
   nav.tabs button .ic{font-size:1.2rem;line-height:1}
@@ -145,6 +156,19 @@
         <span class="label" id="entryTitle">Schicht erfassen</span>
         <button class="linkbtn" id="cancelEdit" hidden>Abbrechen</button>
       </div>
+      <details class="import" id="aufgebotBox">
+        <summary>Aufgebot aus dem Portal einfügen</summary>
+        <div class="body">
+          <p class="hint" style="margin-top:0">Im DELTA-Portal die Seite „Aufgebote“ öffnen, alles markieren und kopieren, dann hier einfügen. Einträge mit RESERVE werden übersprungen, ebenso Einsätze, die sich zeitlich mit einer vorhandenen Schicht am selben Tag überschneiden.</p>
+          <textarea id="aufgebotText" placeholder="Kopierten Text hier einfügen …" spellcheck="false"></textarea>
+          <div class="btnrow" style="margin-top:10px">
+            <button class="btn" id="aufgebotPaste" type="button">Aus Zwischenablage</button>
+            <button class="btn" id="aufgebotCheck" type="button">Prüfen</button>
+          </div>
+          <div id="aufgebotResult"></div>
+          <button class="btn primary" id="aufgebotApply" type="button" hidden>Übernehmen</button>
+        </div>
+      </details>
       <div class="msg" id="entryErr" hidden></div>
       <div class="field"><label for="fDate">Datum</label><input id="fDate" type="date"></div>
       <div class="field"><label for="fType">Schichtart</label><select id="fType"></select></div>
@@ -208,6 +232,7 @@
 <script src="vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/domain.js"></script>
+<script src="js/aufgebot.js"></script>
 <script src="js/repository.js"></script>
 <script src="js/app.js"></script>
 </body>

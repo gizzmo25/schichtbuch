@@ -9,14 +9,15 @@ die Daten liegen in einer Postgres-Datenbank bei Supabase und sind von jedem Ger
 |---|---|
 | `index.html` | Oberfläche (Log, Erfassen, Forecast, Einstellungen, Login) |
 | `js/config.js` | Projekt-URL und Publishable Key (einzige Datei, die du anpassen musst) |
-| `js/domain.js` | Reine Fachlogik: Dauer, Brutto, Monatssummen, Forecast, Validierung, CSV |
+| `js/domain.js` | Reine Fachlogik: Dauer, Brutto, Monatssummen, Forecast, Validierung, Überschneidung, CSV |
+| `js/aufgebot.js` | Parser für den kopierten Text der Portalseite „Aufgebote“ |
 | `js/repository.js` | Lokaler Cache, Outbox und Synchronisation mit Supabase |
 | `js/app.js` | Rendering, Formulare, Login, Sync-Steuerung |
 | `vendor/supabase.js` | supabase-js 2.117.3 (lokal eingebunden, kein CDN nötig) |
 | `sw.js`, `manifest.json`, `icon-*.png` | Installierbarkeit und Offline-Start |
 | `supabase/schema.sql` | Tabellen, Row Level Security, Keepalive-Funktion |
 | `.github/workflows/keepalive.yml` | Täglicher Ping gegen die Pausierung des Gratis-Projekts |
-| `tests/domain.test.js` | Unit-Tests der Fachlogik (`node --test tests/domain.test.js`) |
+| `tests/*.test.js` | Unit-Tests (`node --test tests/domain.test.js tests/aufgebot.test.js`) |
 
 ## Einrichtung
 
@@ -55,6 +56,19 @@ Adresse in Chrome öffnen → Menü → **App installieren**, dann anmelden.
 - **Offline:** Erfassen und Bearbeiten funktionieren, gesendet wird beim nächsten Verbindungsaufbau. Die Anmeldung selbst braucht Internet.
 - **Mehrere Geräte:** Bei gleichzeitiger Bearbeitung derselben Schicht gewinnt die zuletzt gesendete Version.
 - **Forecast:** „Geplant“ ist jede Schicht mit Datum nach heute; eine Schicht von heute zählt als geleistet. Beträge sind brutto.
+
+## Aufgebot aus dem Portal übernehmen
+
+**Erfassen → Aufgebot aus dem Portal einfügen**: Im DELTA-Portal die Seite „Aufgebote“ öffnen, alles markieren
+(Strg+A bzw. lang tippen → Alles auswählen), kopieren und einfügen. „Prüfen“ zeigt jede Zeile mit Status:
+
+- **neu**: wird übernommen (Einsatzzeit „von … bis ca …“, Schichtart und Satz aus den Einstellungen, Auftrag, Ort, Staffelung und Ankunftszeit in der Notiz)
+- **vorhanden**: am selben Tag gibt es bereits eine Schicht, die sich zeitlich überschneidet
+- **Reserve**: Einträge mit RESERVE werden nie übernommen
+- **ohne Zeit / Schichtart?**: keine Einsatzzeit gefunden bzw. Schichtart nicht in den Einstellungen
+
+Der Import kann beliebig oft wiederholt werden; bereits übernommene Einsätze erscheinen dann als „vorhanden“.
+Der eingefügte Text wird nicht gespeichert.
 
 ## Betriebshinweise
 

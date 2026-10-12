@@ -7,7 +7,7 @@
 const CACHE = "schichtbuch-shell";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png",
-  "./vendor/supabase.js", "./js/config.js", "./js/domain.js", "./js/repository.js", "./js/app.js",
+  "./vendor/supabase.js", "./js/config.js", "./js/domain.js", "./js/aufgebot.js", "./js/repository.js", "./js/app.js",
 ];
 
 self.addEventListener("install", (event) => {

@@ -242,6 +242,74 @@
     syncNow();
   }
 
+  /* ---------- Aufgebot aus dem Portal ---------- */
+  const A = globalThis.Aufgebot;
+  let aufgebotPlan = [];
+  const STATUS_LABEL = { new: "neu", existing: "vorhanden", reserve: "Reserve", notime: "ohne Zeit", notype: "Schichtart?" };
+  const STATUS_CLASS = { new: "new", existing: "existing", reserve: "reserve", notime: "warn", notype: "warn" };
+
+  function checkAufgebot() {
+    const text = $("aufgebotText").value;
+    const entries = A.parse(text, repo.settings.shiftTypes);
+    aufgebotPlan = A.plan(entries, repo.shifts, repo.settings, D.overlaps);
+    const box = $("aufgebotResult");
+    if (!entries.length) {
+      box.innerHTML = '<p class="impsum">Keine Einsätze erkannt. Bitte den ganzen Seitentext der „Aufgebote“ kopieren.</p>';
+      $("aufgebotApply").hidden = true;
+      return;
+    }
+    const count = (st) => aufgebotPlan.filter((p) => p.status === st).length;
+    const nNew = count("new");
+    box.innerHTML =
+      '<p class="impsum">' + entries.length + " erkannt: " + nNew + " neu, " + count("existing") + " vorhanden, " + count("reserve") + " Reserve" +
+      (count("notime") + count("notype") ? ", " + (count("notime") + count("notype")) + " nicht übernehmbar" : "") + ".</p>" +
+      aufgebotPlan.map((p) => {
+        const e = p.entry;
+        const time = e.start ? e.start + "–" + e.end : "";
+        const extra = p.status === "existing" && p.match ? "Vorhanden: " + p.match.start + "–" + p.match.end + " · " :
+          p.status === "notype" ? "Unbekannte Schichtart „" + e.roleLine + "“ – in den Einstellungen anlegen · " : "";
+        const gross = p.status === "new" ? " · " + money(D.grossOf(p.shift)) : "";
+        return '<div class="imp"><span class="t">' + esc(dayLabel(e.date) + " " + time) + esc(gross) + "</span>" +
+          '<span class="badge ' + STATUS_CLASS[p.status] + '">' + STATUS_LABEL[p.status] + "</span>" +
+          '<span class="o">' + esc(extra + e.order + (e.place ? " · " + e.place : "")) + "</span></div>";
+      }).join("");
+    $("aufgebotApply").hidden = nNew === 0;
+    $("aufgebotApply").textContent = nNew === 1 ? "1 Einsatz übernehmen" : nNew + " Einsätze übernehmen";
+  }
+
+  function applyAufgebot() {
+    // Erneut gegen den aktuellen Stand pruefen (ein Sync koennte inzwischen Daten geladen haben).
+    const fresh = A.plan(aufgebotPlan.map((p) => p.entry), repo.shifts, repo.settings, D.overlaps).filter((p) => p.status === "new");
+    let added = 0;
+    for (const p of fresh) {
+      try {
+        repo.saveShift(p.shift);
+        added++;
+      } catch (e) {
+        log.warn("Aufgebot-Eintrag nicht übernommen", p.entry, e);
+      }
+    }
+    aufgebotPlan = [];
+    $("aufgebotText").value = "";
+    $("aufgebotResult").innerHTML = "";
+    $("aufgebotApply").hidden = true;
+    $("aufgebotBox").open = false;
+    renderAll();
+    showView("forecast");
+    toast(added === 1 ? "1 Einsatz übernommen." : added + " Einsätze übernommen.");
+    syncNow();
+  }
+
+  async function pasteAufgebot() {
+    try {
+      $("aufgebotText").value = await navigator.clipboard.readText();
+      checkAufgebot();
+    } catch (e) {
+      log.warn("Zwischenablage nicht lesbar", e);
+      toast("Zugriff auf die Zwischenablage nicht möglich. Bitte lang ins Feld tippen und „Einfügen“ wählen.");
+    }
+  }
+
   /* ---------- Einstellungen, Export, Import ---------- */
   function saveSettings() {
     const types = [...document.querySelectorAll("#typeList .typerow")].map((r) => ({
@@ -395,6 +463,9 @@
         '<input class="tRate" aria-label="Stundensatz" type="number" inputmode="decimal" min="0" step="0.05" placeholder="Satz">' +
         '<button type="button" class="iconbtn tDel" aria-label="Schichtart entfernen">×</button></div>');
     });
+    $("aufgebotCheck").addEventListener("click", checkAufgebot);
+    $("aufgebotApply").addEventListener("click", applyAufgebot);
+    $("aufgebotPaste").addEventListener("click", pasteAufgebot);
     $("saveSettings").addEventListener("click", saveSettings);
     $("exportCsv").addEventListener("click", exportCsv);
     $("exportJson").addEventListener("click", exportJson);
