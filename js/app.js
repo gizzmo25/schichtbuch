@@ -58,7 +58,9 @@
   }
   /** Kalendermonat als Monatsname, sonst Datumsbereich. */
   function periodLabel(p) {
-    return startDay() === 1 ? monthName(p.start.slice(0, 7)) : shortDate(p.start).slice(0, 6) + "–" + shortDate(p.end);
+    if (startDay() === 1) return monthName(p.start.slice(0, 7));
+    const sameYear = p.start.slice(0, 4) === p.end.slice(0, 4);
+    return (sameYear ? shortDate(p.start).slice(0, 6) : shortDate(p.start)) + "–" + shortDate(p.end);
   }
   function payLabel(p) {
     const pay = D.payDateOf(p, repo.settings.payDay);
@@ -161,9 +163,105 @@
       (repo.lastSync ? "Letzter Abgleich: " + new Date(repo.lastSync).toLocaleString("de-CH") + "." : "Noch kein Abgleich.");
   }
 
+  /* ---------- Jahresuebersicht ---------- */
+  function renderYears() {
+    const ov = D.yearOverview(repo.shifts, repo.settings, D.nowStamp());
+    const worked = ov.years.reduce((a, y) => a + y.workedGross, 0);
+    const open = ov.years.reduce((a, y) => a + y.plannedGross, 0);
+    const hrs = ov.years.reduce((a, y) => a + y.hours, 0);
+    $("yTotal").textContent = money(worked);
+    $("yNote").textContent = ov.years.length
+      ? hours(hrs) + " in " + ov.years.length + (ov.years.length === 1 ? " Jahr" : " Jahren") + (open ? " · zusätzlich offen " + money(open) : "") + " · brutto"
+      : "Noch keine Schichten erfasst.";
+    const payOk = Boolean(repo.settings.payDay);
+    document.querySelectorAll(".seg button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.basis === ov.basis);
+      b.disabled = b.dataset.basis === "pay" && !payOk;
+    });
+    const thisYear = Number(D.todayISO().slice(0, 4));
+    $("yearList").innerHTML = ov.years.length
+      ? ov.years.map((y) =>
+          '<details class="year"' + (y.year === thisYear ? " open" : "") + "><summary>" +
+          '<span class="y">' + y.year + '</span><span class="g">' + esc(money(y.workedGross)) + "</span>" +
+          '<span class="s">' + esc([hours(y.hours), y.count + (y.count === 1 ? " Schicht" : " Schichten"), y.plannedGross ? "offen " + money(y.plannedGross) : ""].filter(Boolean).join(" · ")) + "</span></summary>" +
+          '<div class="pl">' + y.periods.map((p) =>
+            '<div class="prow"><span class="a">' + esc(periodLabel(p)) + '</span><span class="b">' + esc(money(p.workedGross + p.plannedGross)) + "</span>" +
+            '<span class="c">' + esc([p.pay ? "Auszahlung " + shortDate(p.pay) : "", hours(p.hours), p.plannedGross ? "davon offen " + money(p.plannedGross) : ""].filter(Boolean).join(" · ")) + "</span></div>").join("") +
+          "</div></details>").join("")
+      : '<div class="empty"><div class="big">Keine Daten</div>Sobald Schichten erfasst sind, erscheinen hier die Jahressummen.</div>';
+  }
+
+  function setYearBasis(basis) {
+    if (basis === repo.settings.yearBasis) return;
+    repo.saveSettings({ ...repo.settings, yearBasis: basis });
+    renderYears();
+    syncNow();
+  }
+
+  /* ---------- PDF ---------- */
+  function pdfFmt() {
+    return {
+      money, hours,
+      date: shortDate,
+      day: (iso) => dayLabel(iso),
+      createdAt: new Date().toLocaleString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+    };
+  }
+  /** jsPDF wird verzoegert geladen; ohne Bibliothek (z. B. offline beim ersten Start) klare Meldung. */
+  function jsPdfCtor() {
+    const ctor = globalThis.jspdf && globalThis.jspdf.jsPDF;
+    if (!ctor) throw new Error("PDF-Bibliothek nicht geladen");
+    // Erweiterungen haengen an jsPDF.API. Falls das AutoTable-Plugin sich nicht selbst registriert hat, nachholen.
+    if (typeof ctor.API.autoTable !== "function" && typeof globalThis.applyPlugin === "function") globalThis.applyPlugin(ctor);
+    if (typeof ctor.API.autoTable !== "function") throw new Error("PDF-Tabellen-Plugin nicht geladen");
+    return ctor;
+  }
+  /** PDF anzeigen: Desktop in neuem Tab, Mobilgeraet als Download (oeffnet sich ueber die Download-Meldung). */
+  function deliverPdf(doc, filename) {
+    const blob = doc.output("blob");
+    const url = URL.createObjectURL(blob);
+    const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    const win = coarse ? null : window.open(url, "_blank");
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  function exportPeriodPdf() {
+    try {
+      const period = cursorPeriod();
+      const now = D.nowStamp();
+      const doc = globalThis.Reports.periodReport(jsPdfCtor(), {
+        label: periodLabel(period),
+        payLabel: payLabel(period),
+        summary: D.aggregatePeriod(repo.shifts, period, now),
+        shifts: D.shiftsOfPeriod(repo.shifts, period),
+      }, D, pdfFmt(), now);
+      deliverPdf(doc, "schichtbuch_periode_" + period.start + ".pdf");
+    } catch (e) {
+      log.error("PDF Lohnperiode fehlgeschlagen", e);
+      toast("Das PDF konnte nicht erstellt werden. Bitte mit Internetverbindung erneut versuchen.");
+    }
+  }
+  function exportYearPdf() {
+    try {
+      const ov = D.yearOverview(repo.shifts, repo.settings, D.nowStamp());
+      deliverPdf(globalThis.Reports.yearReport(jsPdfCtor(), ov, pdfFmt(), periodLabel), "schichtbuch_jahresuebersicht_" + D.todayISO() + ".pdf");
+    } catch (e) {
+      log.error("PDF Jahresübersicht fehlgeschlagen", e);
+      toast("Das PDF konnte nicht erstellt werden. Bitte mit Internetverbindung erneut versuchen.");
+    }
+  }
+
   function renderAll() {
     renderLog();
     renderForecast();
+    renderYears();
     renderSettings();
     if (!editingId) renderTypeSelect($("fType").value);
     renderSyncState();
@@ -338,7 +436,7 @@
     const ps = Number($("setPeriodStart").value), pd = Number($("setPayDay").value);
     if (!Number.isInteger(ps) || ps < 1 || ps > 28) { toast("Die Lohnperiode muss an einem Tag zwischen 1 und 28 beginnen."); return; }
     if (!Number.isInteger(pd) || pd < 0 || pd > 28) { toast("Der Auszahltag muss zwischen 1 und 28 liegen (0 = ausblenden)."); return; }
-    repo.saveSettings({ shiftTypes: types, defaultBreak: Number($("setBreak").value) || 0, currency: $("setCurrency").value, periodStartDay: ps, payDay: pd });
+    repo.saveSettings({ ...repo.settings, shiftTypes: types, defaultBreak: Number($("setBreak").value) || 0, currency: $("setCurrency").value, periodStartDay: ps, payDay: pd });
     cursorStart = null;
     if (!editingId) resetEntryForm();
     renderAll();
@@ -412,6 +510,7 @@
     }
     renderLog();
     renderForecast();
+    renderYears();
     renderSettings();
     if (!editingId && !document.querySelector("#view-entry.active")) resetEntryForm();
     renderSyncState();
@@ -476,7 +575,11 @@
       if (!user || document.visibilityState !== "visible") return;
       renderLog();
       renderForecast();
+      renderYears();
     }, 60000);
+    $("periodPdf").addEventListener("click", exportPeriodPdf);
+    $("yearPdf").addEventListener("click", exportYearPdf);
+    document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => setYearBasis(b.dataset.basis)));
     $("logList").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) openEdit(r.dataset.id); });
     $("saveShift").addEventListener("click", saveShift);
     $("deleteShift").addEventListener("click", deleteShift);

@@ -22,7 +22,8 @@
   /** @typedef {{label: string, rate: number}} ShiftType */
   /** @typedef {{defaultBreak: number, currency: string, shiftTypes: ShiftType[], periodStartDay: number, payDay: number}} Settings
    *  periodStartDay: Tag, an dem die Lohnperiode beginnt (1 = Kalendermonat, max. 28)
-   *  payDay:         Auszahltag (1-28); 0 = keine Anzeige */
+   *  payDay:         Auszahltag (1-28); 0 = keine Anzeige
+   *  yearBasis:      "work" = Jahr des Einsatzes, "pay" = Jahr der Auszahlung */
 
   const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
   const RE_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -36,6 +37,7 @@
       currency: "CHF",
       periodStartDay: 1,
       payDay: 10,
+      yearBasis: "work",
       shiftTypes: [
         { label: "ServX", rate: 26 },
         { label: "Basic", rate: 27 },
@@ -183,6 +185,40 @@
       .sort((a, b) => a.start.localeCompare(b.start));
   }
 
+  /**
+   * Jahresuebersicht ueber alle Jahre, neuestes Jahr zuerst.
+   * Jahreszuordnung: "work" nach Einsatzdatum, "pay" nach Auszahldatum der Lohnperiode
+   * (ohne Auszahltag faellt "pay" auf "work" zurueck).
+   * Je Jahr die Lohnperioden mit geleistetem und noch offenem Betrag.
+   */
+  function yearOverview(shifts, settings, now) {
+    const basis = settings.yearBasis === "pay" && settings.payDay ? "pay" : "work";
+    const years = new Map();
+    for (const s of shifts) {
+      const p = periodOf(s.date, settings.periodStartDay);
+      const pay = payDateOf(p, settings.payDay);
+      const year = Number((basis === "pay" ? pay : s.date).slice(0, 4));
+      const y = years.get(year) || { year, hours: 0, workedGross: 0, plannedGross: 0, count: 0, periods: new Map() };
+      const row = y.periods.get(p.start) || { start: p.start, end: p.end, pay, hours: 0, workedGross: 0, plannedGross: 0, count: 0 };
+      const h = durationHours(s.start, s.end, s.breakMinutes);
+      const g = grossOf(s);
+      for (const t of [y, row]) {
+        t.hours += h;
+        t.count += 1;
+        if (isPlanned(s, now)) t.plannedGross += g; else t.workedGross += g;
+      }
+      y.periods.set(p.start, row);
+      years.set(year, y);
+    }
+    const fix = (o) => ({ ...o, hours: round2(o.hours), workedGross: round2(o.workedGross), plannedGross: round2(o.plannedGross) });
+    return {
+      basis,
+      years: [...years.values()]
+        .sort((a, b) => b.year - a.year)
+        .map((y) => ({ ...fix(y), periods: [...y.periods.values()].map(fix).sort((a, b) => a.start.localeCompare(b.start)) })),
+    };
+  }
+
   /** Schichten einer Lohnperiode, neueste zuerst. */
   function shiftsOfPeriod(shifts, period) {
     return shifts
@@ -266,6 +302,7 @@
       shiftTypes: types && types.length ? types : d.shiftTypes,
       periodStartDay: dayIn(raw.periodStartDay, 1, d.periodStartDay),
       payDay: raw.payDay === undefined ? d.payDay : dayIn(raw.payDay, 0, d.payDay),
+      yearBasis: raw.yearBasis === "pay" ? "pay" : "work",
     };
   }
 
@@ -290,7 +327,7 @@
 
   return {
     defaultSettings, toMinutes, todayISO, nowStamp, endStamp, addDays, isValidDate, durationHours, grossOf, isPlanned, monthKey,
-    periodOf, shiftPeriodStart, payDateOf, aggregatePeriod, forecastByPeriod, shiftsOfPeriod,
+    periodOf, shiftPeriodStart, payDateOf, aggregatePeriod, forecastByPeriod, shiftsOfPeriod, yearOverview,
     validateInput, normalizeShift, normalizeSettings,
     isUuid, naturalKey, overlaps, toCsv,
   };

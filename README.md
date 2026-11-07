@@ -11,9 +11,11 @@ die Daten liegen in einer Postgres-Datenbank bei Supabase und sind von jedem Ger
 | `js/config.js` | Projekt-URL und Publishable Key (einzige Datei, die du anpassen musst) |
 | `js/domain.js` | Reine Fachlogik: Dauer, Brutto, Monatssummen, Forecast, Validierung, Überschneidung, CSV |
 | `js/aufgebot.js` | Parser für den kopierten Text der Portalseite „Aufgebote“ |
+| `js/pdf.js` | PDF-Berichte für Lohnperiode und Jahresübersicht |
 | `js/repository.js` | Lokaler Cache, Outbox und Synchronisation mit Supabase |
 | `js/app.js` | Rendering, Formulare, Login, Sync-Steuerung |
 | `vendor/supabase.js` | supabase-js 2.117.3 (lokal eingebunden, kein CDN nötig) |
+| `vendor/jspdf*.js` | jsPDF 2.5.2 und jsPDF-AutoTable 3.8.4 für den PDF-Export |
 | `sw.js`, `manifest.json`, `icon-*.png` | Installierbarkeit und Offline-Start |
 | `supabase/schema.sql` | Tabellen, Row Level Security, Keepalive-Funktion |
 | `.github/workflows/keepalive.yml` | Täglicher Ping gegen die Pausierung des Gratis-Projekts |
@@ -72,6 +74,12 @@ Adresse in Chrome öffnen → Menü → **App installieren**, dann anmelden.
 
 Der Import kann beliebig oft wiederholt werden; bereits übernommene Einsätze erscheinen dann als „vorhanden“.
 Der eingefügte Text wird nicht gespeichert.
+
+## Jahresübersicht und PDF
+
+- **Jahre:** Summe über alle Jahre und je Jahr, aufgeteilt nach Lohnperioden. Gross angezeigt wird der geleistete Betrag; noch offene Schichten sind separat ausgewiesen.
+- **Zuordnung:** „nach Einsatzdatum“ zählt eine Schicht zum Jahr, in dem sie stattfand. „nach Auszahlung“ zählt sie zum Jahr ihres Auszahldatums, so wie es auf dem Lohnausweis erscheint (zum Beispiel wird ein Einsatz im Dezember mit Auszahlung im Januar dem neuen Jahr zugerechnet). Die Wahl wird gespeichert.
+- **PDF:** „Als PDF“ im Log (angezeigte Lohnperiode mit allen Schichten) und unter Jahre (alle Jahre mit Perioden). Am Computer öffnet sich das PDF in einem neuen Tab, auf dem Handy wird es heruntergeladen und lässt sich über die Download-Meldung öffnen.
 
 ## Betriebshinweise
 

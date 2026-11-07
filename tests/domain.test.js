@@ -89,7 +89,9 @@ test("normalizeShift: Altformat v1 und DB-Zeitformat", () => {
 test("normalizeSettings faellt auf Standardwerte zurueck", () => {
   assert.deepEqual(D.normalizeSettings(null), D.defaultSettings());
   const s = D.normalizeSettings({ currency: "EUR", defaultBreak: 30, shiftTypes: [{ label: "X", rate: 30 }, { label: "", rate: 1 }] });
-  assert.deepEqual(s, { currency: "EUR", defaultBreak: 30, shiftTypes: [{ label: "X", rate: 30 }], periodStartDay: 1, payDay: 10 });
+  assert.deepEqual(s, { currency: "EUR", defaultBreak: 30, shiftTypes: [{ label: "X", rate: 30 }], periodStartDay: 1, payDay: 10, yearBasis: "work" });
+  assert.equal(D.normalizeSettings({ yearBasis: "pay" }).yearBasis, "pay");
+  assert.equal(D.normalizeSettings({ yearBasis: "x" }).yearBasis, "work");
   const t = D.normalizeSettings({ periodStartDay: 11, payDay: 0 });
   assert.equal(t.periodStartDay, 11);
   assert.equal(t.payDay, 0);
@@ -102,4 +104,28 @@ test("toCsv: Trennzeichen, Quoting, Formel-Schutz", () => {
   const lines = csv.trim().split("\r\n");
   assert.equal(lines.length, 2);
   assert.equal(lines[1], '2026-10-10;08:00;16:00;0;Basic;8.00;27.00;216.00;CHF;geleistet;"\'=SUM(A1);""x"""');
+});
+
+test("yearOverview: Jahre nach Einsatz- oder Auszahldatum, Perioden, geleistet/offen", () => {
+  const shifts = [
+    shift({ date: "2025-11-20" }),
+    shift({ date: "2025-12-15" }),            // Periode 10.12.25-09.01.26, Auszahlung 10.01.2026
+    shift({ date: "2026-01-05" }),            // gleiche Periode
+    shift({ date: "2026-02-03", rate: 26 }),  // offen
+  ];
+  const base = { ...D.defaultSettings(), periodStartDay: 10, payDay: 10 };
+  const now = "2026-02-01T00:00";
+  const w = D.yearOverview(shifts, base, now);
+  assert.equal(w.basis, "work");
+  assert.deepEqual(w.years.map((y) => [y.year, y.workedGross, y.plannedGross, y.count]), [[2026, 216, 208, 2], [2025, 432, 0, 2]]);
+  assert.deepEqual(w.years[1].periods.map((p) => p.start), ["2025-11-10", "2025-12-10"]);
+
+  const p = D.yearOverview(shifts, { ...base, yearBasis: "pay" }, now);
+  assert.equal(p.basis, "pay");
+  // 20.11.25 -> Auszahlung 10.12.25 (2025); 15.12.25 und 05.01.26 -> 10.01.26 (2026); 03.02.26 -> 10.02.26
+  assert.deepEqual(p.years.map((y) => [y.year, y.workedGross + y.plannedGross, y.count]), [[2026, 640, 3], [2025, 216, 1]]);
+  assert.deepEqual(p.years[0].periods[0], { start: "2025-12-10", end: "2026-01-09", pay: "2026-01-10", hours: 16, workedGross: 432, plannedGross: 0, count: 2 });
+
+  assert.equal(D.yearOverview(shifts, { ...base, yearBasis: "pay", payDay: 0 }, now).basis, "work");
+  assert.deepEqual(D.yearOverview([], base, now).years, []);
 });

@@ -32,6 +32,22 @@
   .monthnav .label{font-family:var(--mono);font-weight:600}
   .paylabel{display:block;font-size:.72rem;font-weight:400;color:var(--muted);margin-top:3px}
   .paylabel:empty{display:none}
+  .pdfbtn{display:block;margin:-6px 0 14px auto;background:none;border:1px solid var(--line);color:var(--text);border-radius:999px;padding:7px 14px;font-size:.8rem;cursor:pointer;font-family:var(--sans)}
+  .pdfbtn:active{background:var(--surface-2)}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px}
+  .seg button{background:none;border:none;color:var(--muted);border-radius:9px;padding:10px 6px;font-size:.84rem;cursor:pointer;font-family:var(--sans);min-height:40px}
+  .seg button.on{background:var(--surface-2);color:var(--text);font-weight:600}
+  details.year{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  details.year summary{list-style:none;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 14px;cursor:pointer}
+  details.year summary::-webkit-details-marker{display:none}
+  details.year .y{font-family:var(--mono);font-weight:650;font-size:1.05rem}
+  details.year .g{font-family:var(--mono);font-weight:600;text-align:right}
+  details.year .s{grid-column:1/-1;color:var(--muted);font-size:.76rem;font-family:var(--mono)}
+  details.year .pl{border-top:1px solid var(--line);padding:4px 14px 8px}
+  .prow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.82rem}
+  .prow:last-child{border-bottom:none}
+  .prow .a{font-family:var(--mono)} .prow .b{font-family:var(--mono);text-align:right}
+  .prow .c{grid-column:1/-1;color:var(--muted);font-size:.74rem}
   .iconbtn{background:var(--surface);border:1px solid var(--line);color:var(--text);width:44px;height:44px;border-radius:12px;font-size:1.3rem;cursor:pointer}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
@@ -98,7 +114,7 @@
   .badge.new{color:var(--planned);border-color:var(--planned)} .badge.existing{color:var(--muted)}
   .badge.reserve{color:var(--muted);border-style:dashed} .badge.warn{color:var(--danger);border-color:var(--danger)}
   .impsum{font-size:.84rem;color:var(--muted);margin:10px 0}
-  nav.tabs{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(15,17,21,.96);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(15,17,21,.96);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   nav.tabs button{background:none;border:none;color:var(--muted);padding:10px 4px;font-size:.72rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--sans);min-height:58px}
   nav.tabs button .ic{font-size:1.2rem;line-height:1}
   nav.tabs button.active{color:var(--signal)}
@@ -150,6 +166,7 @@
           <span><span class="dot planned"></span>Geplant <b id="mPlanned">—</b></span>
         </div></div>
       </div>
+      <button class="pdfbtn" id="periodPdf" type="button">Als PDF</button>
       <div id="logList"></div>
     </section>
 
@@ -186,6 +203,20 @@
       <div class="preview" id="previewBox"></div>
       <button class="btn primary" id="saveShift">Schicht speichern</button>
       <button class="btn danger" id="deleteShift" hidden>Schicht löschen</button>
+    </section>
+
+    <section id="view-years" class="view">
+      <div class="total">
+        <div class="k">Verdient über alle Jahre (geleistet)</div>
+        <div class="v" id="yTotal" style="color:var(--signal)">—</div>
+        <div class="note" id="yNote"></div>
+      </div>
+      <div class="seg" role="group" aria-label="Jahr zuordnen nach">
+        <button type="button" data-basis="work">nach Einsatzdatum</button>
+        <button type="button" data-basis="pay">nach Auszahlung</button>
+      </div>
+      <button class="pdfbtn" id="yearPdf" type="button">Als PDF</button>
+      <div id="yearList"></div>
     </section>
 
     <section id="view-forecast" class="view">
@@ -232,14 +263,18 @@
   <button data-view="log" class="active"><span class="ic">▤</span>Log</button>
   <button data-view="entry"><span class="ic">＋</span>Erfassen</button>
   <button data-view="forecast"><span class="ic">↗</span>Forecast</button>
+  <button data-view="years"><span class="ic">∑</span>Jahre</button>
   <button data-view="settings"><span class="ic">⚙</span>Einstellungen</button>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="vendor/supabase.js"></script>
+<script src="vendor/jspdf.umd.min.js" defer></script>
+<script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
 <script src="js/config.js"></script>
 <script src="js/domain.js"></script>
 <script src="js/aufgebot.js"></script>
+<script src="js/pdf.js"></script>
 <script src="js/repository.js"></script>
 <script src="js/app.js"></script>
 </body>
