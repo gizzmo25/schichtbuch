@@ -131,12 +131,12 @@
     return Math.floor(t / 12) + "-" + String((t % 12) + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
   }
 
-  /** Auszahlung: erster Auszahltag nach dem Periodenende. null, wenn payDay 0. */
+  /** Auszahlung: erster Auszahltag am oder nach dem Periodenende. null, wenn payDay 0. */
   function payDateOf(period, payDay) {
     if (!payDay) return null;
     const [y, m] = period.end.split("-").map(Number);
     const same = y + "-" + String(m).padStart(2, "0") + "-" + String(payDay).padStart(2, "0");
-    return same > period.end ? same : shiftPeriodStart(same, 1);
+    return same >= period.end ? same : shiftPeriodStart(same, 1);
   }
 
   const inPeriod = (s, p) => s.date >= p.start && s.date <= p.end;

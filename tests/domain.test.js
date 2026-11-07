@@ -42,10 +42,10 @@ test("periodOf: Kalendermonat und versetzte Periode inkl. Jahreswechsel", () => 
   assert.equal(D.shiftPeriodStart("2026-01-11", -1), "2025-12-11");
 });
 
-test("payDateOf: erster Auszahltag nach Periodenende", () => {
+test("payDateOf: erster Auszahltag am oder nach Periodenende", () => {
   assert.equal(D.payDateOf({ start: "2026-11-01", end: "2026-11-30" }, 10), "2026-12-10");
   assert.equal(D.payDateOf({ start: "2026-12-01", end: "2026-12-31" }, 10), "2027-01-10");
-  assert.equal(D.payDateOf({ start: "2026-10-11", end: "2026-11-10" }, 10), "2026-12-10");
+  assert.equal(D.payDateOf({ start: "2026-10-11", end: "2026-11-10" }, 10), "2026-11-10"); // Ende am Auszahltag
   assert.equal(D.payDateOf({ start: "2026-10-10", end: "2026-11-09" }, 10), "2026-11-10");
   assert.equal(D.payDateOf({ start: "2026-11-01", end: "2026-11-30" }, 0), null);
 });
