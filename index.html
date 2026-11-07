@@ -30,6 +30,8 @@
 
   .monthnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .monthnav .label{font-family:var(--mono);font-weight:600}
+  .paylabel{display:block;font-size:.72rem;font-weight:400;color:var(--muted);margin-top:3px}
+  .paylabel:empty{display:none}
   .iconbtn{background:var(--surface);border:1px solid var(--line);color:var(--text);width:44px;height:44px;border-radius:12px;font-size:1.3rem;cursor:pointer}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
@@ -137,7 +139,7 @@
     <section id="view-log" class="view active">
       <div class="monthnav">
         <button class="iconbtn" id="prevMonth" aria-label="Vorheriger Monat">‹</button>
-        <span class="label" id="monthLabel">—</span>
+        <span class="label" style="text-align:center"><span id="monthLabel">—</span><span class="paylabel" id="payLabel"></span></span>
         <button class="iconbtn" id="nextMonth" aria-label="Nächster Monat">›</button>
       </div>
       <div class="cards">
@@ -188,7 +190,7 @@
 
     <section id="view-forecast" class="view">
       <div class="total">
-        <div class="k">Erwarteter Verdienst (geplant, ab morgen)</div>
+        <div class="k">Erwarteter Verdienst (noch nicht geleistet)</div>
         <div class="v" id="fcTotal">—</div>
         <div class="note" id="fcNote"></div>
       </div>
@@ -203,6 +205,11 @@
         <div class="field"><label for="setBreak">Standard-Pause (Min.)</label><input id="setBreak" type="number" inputmode="numeric" min="0" step="5"></div>
         <div class="field"><label for="setCurrency">Währung</label><select id="setCurrency"><option>CHF</option><option>EUR</option></select></div>
       </div>
+      <div class="grid2">
+        <div class="field"><label for="setPeriodStart">Lohnperiode beginnt am</label><input id="setPeriodStart" type="number" inputmode="numeric" min="1" max="28" step="1"></div>
+        <div class="field"><label for="setPayDay">Auszahlung am</label><input id="setPayDay" type="number" inputmode="numeric" min="0" max="28" step="1"></div>
+      </div>
+      <p class="hint" style="margin-top:-4px">Tag 1 = Kalendermonat. Bei z. B. 11 läuft eine Periode vom 11. bis zum 10. des Folgemonats. Angezeigt wird als Auszahlung der erste Auszahltag nach Periodenende; 0 blendet ihn aus.</p>
       <button class="btn primary" id="saveSettings">Einstellungen speichern</button>
 
       <h2>Export &amp; Backup</h2>

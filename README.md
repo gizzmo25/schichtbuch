@@ -55,7 +55,10 @@ Adresse in Chrome öffnen → Menü → **App installieren**, dann anmelden.
 - **Browserdaten gelöscht:** neu anmelden, der Stand wird vollständig geladen. Verloren gehen höchstens Änderungen, die noch nicht gesendet waren (Anzeige „n offen“).
 - **Offline:** Erfassen und Bearbeiten funktionieren, gesendet wird beim nächsten Verbindungsaufbau. Die Anmeldung selbst braucht Internet.
 - **Mehrere Geräte:** Bei gleichzeitiger Bearbeitung derselben Schicht gewinnt die zuletzt gesendete Version.
-- **Forecast:** „Geplant“ ist jede Schicht mit Datum nach heute; eine Schicht von heute zählt als geleistet. Beträge sind brutto.
+- **Geleistet / geplant:** Eine Schicht gilt erst als geleistet, wenn ihr Dienstende erreicht ist; bei Nachtschichten (Ende vor Beginn) ist das am Folgetag. Laufende und künftige Dienste sind geplant. Die Anzeige aktualisiert sich jede Minute.
+- **Lohnperiode:** In den Einstellungen festgelegt. „Lohnperiode beginnt am“ 1 = Kalendermonat; bei z. B. 11 läuft die Periode vom 11. bis zum 10. des Folgemonats. Log und Forecast rechnen pro Periode.
+- **Auszahlung:** Angezeigt wird der erste Auszahltag nach dem Periodenende (0 = ausblenden). Das ist eine Berechnung, keine Angabe des Arbeitgebers.
+- **Forecast:** Summe aller noch nicht geleisteten Schichten, je Lohnperiode; „Periode gesamt“ enthält zusätzlich das in derselben Periode bereits Geleistete. Beträge sind brutto.
 
 ## Aufgebot aus dem Portal übernehmen
 

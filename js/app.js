@@ -42,15 +42,28 @@
   let user = null;
   let editingId = null;
   let syncError = null;
-  const cursor = new Date();
-  cursor.setDate(1);
+  /** Beginn der im Log angezeigten Lohnperiode (ISO); null = aktuelle Periode. */
+  let cursorStart = null;
 
   /* ---------- Formatierung ---------- */
   const money = (n) => new Intl.NumberFormat("de-CH", { style: "currency", currency: repo.settings.currency }).format(n);
   const hours = (n) => new Intl.NumberFormat("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " h";
   const monthName = (ym) => new Date(ym + "-01T12:00:00").toLocaleDateString("de-CH", { month: "long", year: "numeric" });
   const dayLabel = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
-  const cursorMonth = () => cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0");
+  const shortDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const startDay = () => repo.settings.periodStartDay;
+  /** Aktuell angezeigte Lohnperiode; folgt der Einstellung, auch wenn sie geaendert wurde. */
+  function cursorPeriod() {
+    return D.periodOf(cursorStart || D.todayISO(), startDay());
+  }
+  /** Kalendermonat als Monatsname, sonst Datumsbereich. */
+  function periodLabel(p) {
+    return startDay() === 1 ? monthName(p.start.slice(0, 7)) : shortDate(p.start).slice(0, 6) + "–" + shortDate(p.end);
+  }
+  function payLabel(p) {
+    const pay = D.payDateOf(p, repo.settings.payDay);
+    return pay ? "Auszahlung " + shortDate(pay) : "";
+  }
 
   let toastTimer = null;
   function toast(text) {
@@ -84,43 +97,45 @@
   }
 
   function renderLog() {
-    const month = cursorMonth();
-    const today = D.todayISO();
-    const a = D.aggregateMonth(repo.shifts, month, today);
-    $("monthLabel").textContent = monthName(month);
+    const period = cursorPeriod();
+    const now = D.nowStamp();
+    const a = D.aggregatePeriod(repo.shifts, period, now);
+    $("monthLabel").textContent = periodLabel(period);
+    $("payLabel").textContent = payLabel(period);
     $("mHours").textContent = hours(a.hours);
     $("mGross").textContent = money(a.gross);
     $("mWorked").textContent = money(a.workedGross);
     $("mPlanned").textContent = money(a.plannedGross);
-    const rows = D.shiftsOfMonth(repo.shifts, month);
+    const rows = D.shiftsOfPeriod(repo.shifts, period);
     $("logList").innerHTML = rows.length
       ? rows.map((s) => {
           const h = D.durationHours(s.start, s.end, s.breakMinutes);
           const meta = [s.start + "–" + s.end, s.type, s.breakMinutes ? s.breakMinutes + " Min. Pause" : "", s.note].filter(Boolean).map(esc).join(" · ");
           return '<button type="button" class="row" data-id="' + esc(s.id) + '">' +
-            '<span class="bar-s' + (D.isPlanned(s, today) ? " planned" : "") + '"></span>' +
+            '<span class="bar-s' + (D.isPlanned(s, now) ? " planned" : "") + '"></span>' +
             '<span class="when"><div class="date">' + esc(dayLabel(s.date)) + '</div><div class="meta">' + meta + "</div></span>" +
             '<span class="amt"><div class="gross">' + esc(money(D.grossOf(s))) + '</div><div class="hrs">' + esc(hours(h)) + "</div></span></button>";
         }).join("")
-      : '<div class="empty"><div class="big">Keine Schichten in diesem Monat</div>Über „Erfassen“ trägst du geleistete und geplante Schichten ein.</div>';
+      : '<div class="empty"><div class="big">Keine Schichten in dieser Lohnperiode</div>Über „Erfassen“ trägst du geleistete und geplante Schichten ein.</div>';
   }
 
   function renderForecast() {
-    const rows = D.forecastByMonth(repo.shifts, D.todayISO());
+    const rows = D.forecastByPeriod(repo.shifts, D.nowStamp(), startDay());
     const total = rows.reduce((a, r) => a + r.gross, 0);
     const totalHours = rows.reduce((a, r) => a + r.hours, 0);
     const count = rows.reduce((a, r) => a + r.count, 0);
     $("fcTotal").textContent = money(total);
     $("fcNote").textContent = rows.length
       ? count + (count === 1 ? " Schicht" : " Schichten") + " · " + hours(totalHours) + " · brutto"
-      : "Noch keine zukünftigen Schichten erfasst.";
+      : "Keine offenen Schichten erfasst.";
     const max = Math.max(1, ...rows.map((r) => r.gross));
     $("fcList").innerHTML = rows.length
       ? rows.map((r) =>
-          '<div class="fc-row"><div class="top"><span class="m">' + esc(monthName(r.month)) + '</span><span class="g">' + esc(money(r.gross)) + "</span></div>" +
+          '<div class="fc-row"><div class="top"><span class="m">' + esc(periodLabel(r)) + '</span><span class="g">' + esc(money(r.gross)) + "</span></div>" +
           '<div class="track"><div style="width:' + ((r.gross / max) * 100).toFixed(1) + '%"></div></div>' +
-          '<div class="h">' + esc(hours(r.hours)) + " · " + r.count + (r.count === 1 ? " Schicht" : " Schichten") + "</div></div>").join("")
-      : '<div class="empty"><div class="big">Kein Forecast</div>Erfasse Schichten mit einem Datum in der Zukunft, um den erwarteten Verdienst zu sehen.</div>';
+          '<div class="h">' + esc([hours(r.hours), r.count + (r.count === 1 ? " Schicht" : " Schichten"),
+            r.workedGross ? "Periode gesamt " + money(r.gross + r.workedGross) : "", payLabel(r)].filter(Boolean).join(" · ")) + "</div></div>").join("")
+      : '<div class="empty"><div class="big">Kein Forecast</div>Erfasse geplante Schichten, um den erwarteten Verdienst zu sehen.</div>';
   }
 
   function renderTypeSelect(selected) {
@@ -140,6 +155,8 @@
       '<button type="button" class="iconbtn tDel" aria-label="Schichtart entfernen">×</button></div>').join("");
     $("setBreak").value = String(s.defaultBreak);
     $("setCurrency").value = s.currency;
+    $("setPeriodStart").value = String(s.periodStartDay);
+    $("setPayDay").value = String(s.payDay);
     $("accountInfo").textContent = "Angemeldet als " + (user ? user.email : "—") + ". " +
       (repo.lastSync ? "Letzter Abgleich: " + new Date(repo.lastSync).toLocaleString("de-CH") + "." : "Noch kein Abgleich.");
   }
@@ -222,8 +239,7 @@
     if (!v.ok) { showErr("entryErr", v.msg); return; }
     try {
       const saved = repo.saveShift({ ...f, id: editingId || undefined });
-      const [y, m] = saved.date.split("-").map(Number);
-      cursor.setFullYear(y, m - 1, 1); // Log auf den Monat der Schicht springen lassen
+      cursorStart = D.periodOf(saved.date, startDay()).start; // Log auf die Periode der Schicht springen lassen
       resetEntryForm();
       renderAll();
       showView("log");
@@ -319,7 +335,11 @@
     if (types.some((t) => !t.label || !Number.isFinite(t.rate) || t.rate < 0)) { toast("Jede Schichtart braucht eine Bezeichnung und einen Satz ≥ 0."); return; }
     if (new Set(types.map((t) => t.label)).size !== types.length) { toast("Schichtarten müssen unterschiedliche Bezeichnungen haben."); return; }
     if (!types.length) { toast("Mindestens eine Schichtart wird benötigt."); return; }
-    repo.saveSettings({ shiftTypes: types, defaultBreak: Number($("setBreak").value) || 0, currency: $("setCurrency").value });
+    const ps = Number($("setPeriodStart").value), pd = Number($("setPayDay").value);
+    if (!Number.isInteger(ps) || ps < 1 || ps > 28) { toast("Die Lohnperiode muss an einem Tag zwischen 1 und 28 beginnen."); return; }
+    if (!Number.isInteger(pd) || pd < 0 || pd > 28) { toast("Der Auszahltag muss zwischen 1 und 28 liegen (0 = ausblenden)."); return; }
+    repo.saveSettings({ shiftTypes: types, defaultBreak: Number($("setBreak").value) || 0, currency: $("setCurrency").value, periodStartDay: ps, payDay: pd });
+    cursorStart = null;
     if (!editingId) resetEntryForm();
     renderAll();
     toast("Einstellungen gespeichert.");
@@ -336,7 +356,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function exportCsv() {
-    download("schichtbuch_" + D.todayISO() + ".csv", "text/csv;charset=utf-8", "﻿" + D.toCsv(repo.shifts, repo.settings.currency, D.todayISO()));
+    download("schichtbuch_" + D.todayISO() + ".csv", "text/csv;charset=utf-8", "﻿" + D.toCsv(repo.shifts, repo.settings.currency, D.nowStamp()));
   }
   function exportJson() {
     download("schichtbuch_backup_" + D.todayISO() + ".json", "application/json", JSON.stringify(repo.exportBackup(), null, 2));
@@ -449,8 +469,14 @@
       renderAll();
       showView(v);
     }));
-    $("prevMonth").addEventListener("click", () => { cursor.setMonth(cursor.getMonth() - 1); renderLog(); });
-    $("nextMonth").addEventListener("click", () => { cursor.setMonth(cursor.getMonth() + 1); renderLog(); });
+    $("prevMonth").addEventListener("click", () => { cursorStart = D.shiftPeriodStart(cursorPeriod().start, -1); renderLog(); });
+    $("nextMonth").addEventListener("click", () => { cursorStart = D.shiftPeriodStart(cursorPeriod().start, 1); renderLog(); });
+    // Status (geplant -> geleistet) haengt von der Uhrzeit ab: offene Ansicht jede Minute neu zeichnen.
+    setInterval(() => {
+      if (!user || document.visibilityState !== "visible") return;
+      renderLog();
+      renderForecast();
+    }, 60000);
     $("logList").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) openEdit(r.dataset.id); });
     $("saveShift").addEventListener("click", saveShift);
     $("deleteShift").addEventListener("click", deleteShift);
